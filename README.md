@@ -57,13 +57,12 @@ To tackle these, we introduce:
 <th>FreeLOC (Ours, 4×)</th>
 </tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/eb64e8b3-e6f3-4be2-9838-454b92f93f6c" width="100%"></video></td>
-<td><video src="https://github.com/user-attachments/assets/8db5017f-e774-414c-932c-958f3441570c
-" width="100%"></video></td>
+<td><video src="https://github.com/user-attachments/assets/3fc75ee6-3a91-4eb7-94fe-4dac982cd480" width="100%"></video></td>
+<td><video src="https://github.com/user-attachments/assets/9054b4ac-2e30-4c80-a574-fc48b257c40c" width="100%"></video></td>
 </tr>
 <tr>
-<td><video src="https://github.com/user-attachments/assets/2cb27e60-d442-47fb-8e86-5c6bed393510" width="100%"></video></td>
-<td><video src="https://github.com/user-attachments/assets/6e20dae9-8bb8-4900-a745-76c7df51cedc" width="100%"></video></td>
+<td><video src="https://github.com/user-attachments/assets/a932bbaf-2fea-4dc2-93f2-e0c3da1eba56" width="100%"></video></td>
+<td><video src="https://github.com/user-attachments/assets/0d968e35-00a9-4409-825e-98729f3f4b23" width="100%"></video></td>
 </tr>
 </table>
 
