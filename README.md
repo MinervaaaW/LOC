@@ -6,9 +6,9 @@
 
 <div align="center">
   <p>
-    <a href="https://github.com/tianjiahao">Jiahao Tian</a><sup>1</sup>&nbsp;&nbsp;
-    Chenxi Song<sup>1*</sup>&nbsp;&nbsp;
-    Wei Cheng<sup>1</sup>&nbsp;&nbsp;
+    <a href="">Jiahao Tian</a><sup>1</sup>&nbsp;&nbsp;
+    <a href="">Chenxi Song<sup>1*</sup>&nbsp;&nbsp;
+    <a href="">Wei Cheng<sup>1</sup>&nbsp;&nbsp;
     <a href="">Chi Zhang</a><sup>1†</sup>
   </p>
   <p>
