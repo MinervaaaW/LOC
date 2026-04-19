@@ -67,7 +67,9 @@ def _deep_merge_dict(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str
 
 def load_runtime_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     merged_config = copy.deepcopy(DEFAULT_RUNTIME_CONFIG)
-    if not config_path:
+     # ====================== 核心修复 ======================
+    # 不传参数 / 传空字符串 / 传空白字符 → 直接用默认，不读任何文件
+    if config_path is None or config_path.strip() == "":
         return merged_config
 
     resolved_path = os.path.abspath(config_path)

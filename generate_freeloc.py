@@ -247,7 +247,7 @@ def _parse_args():
     parser.add_argument(
         "--runtime_config",
         type=str,
-        default="wan/configs/freeloc_config.json",
+        default="",
         help="Path to runtime config JSON for long-video generation parameters.")
 
     args = parser.parse_args()

@@ -64,7 +64,7 @@ window_size=2, window_size_2=4,
     return block_masks
 
 def prepare_flexattention_radial_attention(device, frame_size, context_length=0, num_frame=20, \
-window_size=2, window_size_2=4, enbale_relative_position_map=True
+window_size=2, window_size_2=4, enbale_relative_position_map=True, dtype=torch.bfloat16
 ):  
     # context_length=0 for Wan2.1
     seq_len = context_length + num_frame * frame_size
@@ -111,23 +111,23 @@ def generate_VRPR_mask_mod(token_per_frame=1350, window_size=2, window_size_2=4,
     window_token_num = round_to_multiple(token_per_frame * window_size)
     window_token_num_2 = round_to_multiple(token_per_frame * window_size_2)
 
-    def mask_mod_1(q_idx, kv_idx):
+    def mask_mod_1(b, h,q_idx, kv_idx):
         shift_attn_mask = (q_idx-kv_idx>=window_token_num_2)
         return shift_attn_mask
     
-    def mask_mod_2(q_idx, kv_idx):
+    def mask_mod_2(b, h,q_idx, kv_idx):
         shift_attn_mask_1 = (q_idx - kv_idx >= window_token_num)
         shift_attn_mask_2 = (q_idx - kv_idx < window_token_num_2)
         shift_attn_mask = shift_attn_mask_1 & shift_attn_mask_2
         return shift_attn_mask
     
-    def mask_mod_3(q_idx, kv_idx):
+    def mask_mod_3(b, h,q_idx, kv_idx):
         shift_attn_mask_1 = (q_idx - kv_idx > -window_token_num_2)
         shift_attn_mask_2 =  (q_idx - kv_idx <= -window_token_num)
         shift_attn_mask = shift_attn_mask_1 & shift_attn_mask_2
         return shift_attn_mask
     
-    def mask_mod_4(q_idx, kv_idx):
+    def mask_mod_4(b, h,q_idx, kv_idx):
         shift_attn_mask = (q_idx - kv_idx <= -window_token_num_2)
         return shift_attn_mask
         
@@ -149,7 +149,7 @@ def generate_radial_mask_mod(token_per_frame=1350, window_size=2, window_size_2=
     window_token_num = round_to_multiple(token_per_frame * window_size)
     window_token_num_2 = round_to_multiple(token_per_frame * window_size_2)
     # import pdb;pdb.set_trace()
-    def mask_mod(q_idx, kv_idx):
+    def mask_mod(b, h, q_idx, kv_idx):
         shift_attn_mask =  (torch.abs(q_idx - kv_idx) > window_token_num) & (torch.abs(q_idx - kv_idx) <= window_token_num_2)
         q_token_id = get_token_id_in_frame(q_idx, 0)
         kv_token_id = get_token_id_in_frame(kv_idx, 0)
@@ -179,19 +179,19 @@ def generate_radial_mask_mod_plus(token_per_frame=1350, window_size=2, window_si
     window_token_num = round_to_multiple(token_per_frame * window_size)
     window_token_num_2 = round_to_multiple(token_per_frame * window_size_2)
 
-    def mask_mod_1(q_idx, kv_idx):
+    def mask_mod_1(b, h,q_idx, kv_idx):
         if use_first_frame_mask:
             first_column_mask = (kv_idx < round_to_multiple(token_per_frame * 1)) & (q_idx - kv_idx > window_token_num_2)
 
         return first_column_mask
     
-    def mask_mod_2(q_idx, kv_idx):
+    def mask_mod_2(b, h,q_idx, kv_idx):
         if use_first_frame_mask:
             first_column_mask = (kv_idx > round_to_multiple(token_per_frame * 78)) & (q_idx - kv_idx < -window_token_num_2)
 
         return first_column_mask
     
-    def mask_mod_3(q_idx, kv_idx):
+    def mask_mod_3(b, h,q_idx, kv_idx):
         shift_attn_mask =  (torch.abs(q_idx - kv_idx) > window_token_num) & (torch.abs(q_idx - kv_idx) <= window_token_num_2)
 
         q_token_id = get_token_id_in_frame(q_idx, 0)
@@ -1118,10 +1118,10 @@ class WanModel_Freeloc(ModelMixin, ConfigMixin):
             radial_window_size_2 = radial_attention_cfg.get(
                 "window_size_2", 32)
             block_mask = prepare_flexattention_radial_attention(
-                B,
-                self.num_heads,
-                self.dim // self.num_heads,
-                dtype=torch.bfloat16,
+                # B,
+                # self.num_heads,
+                # self.dim // self.num_heads,
+                # dtype=torch.bfloat16,
                 device='cuda',
                 frame_size=((H // 2) * (W // 2)),
                 context_length=0,
@@ -1138,10 +1138,10 @@ class WanModel_Freeloc(ModelMixin, ConfigMixin):
             }
         else:
             block_mask = prepare_flexattention(
-                B,
-                self.num_heads,
-                self.dim // self.num_heads,
-                dtype=torch.bfloat16,
+                # B,
+                # self.num_heads,
+                # self.dim // self.num_heads,
+                # dtype=torch.bfloat16,
                 device='cuda',
                 frame_size=((H // 2) * (W // 2)),
                 context_length=0,
@@ -1167,10 +1167,10 @@ class WanModel_Freeloc(ModelMixin, ConfigMixin):
                 group_size_1 = frame_cfg["group_size_1"]
                 group_size_2 = frame_cfg["group_size_2"]
                 block_masks = prepare_flexattention_VRPR(
-                    B,
-                    self.num_heads,
-                    self.dim // self.num_heads,
-                    dtype=torch.bfloat16,
+                    # B,
+                    # self.num_heads,
+                    # self.dim // self.num_heads,
+                    # dtype=torch.bfloat16,
                     device='cuda',
                     frame_size=((H // 2) * (W // 2)),
                     context_length=0,
