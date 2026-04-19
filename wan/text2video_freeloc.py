@@ -15,80 +15,24 @@ from sympy import N
 import torch
 import torch.cuda.amp as amp
 import torch.distributed as dist
-from safetensors.torch import load_file as safe_load_file
 from tqdm import tqdm
 
 from .distributed.fsdp import shard_model
 from .modules.model_freeloc import WanModel_Freeloc
 from .modules.t5 import T5EncoderModel
 from .modules.vae import WanVAE
+from .utils.checkpoint_utils import (
+    compare_state_dicts,
+    infer_model_family,
+    load_state_dict_from_checkpoint,
+    summarize_state_dict,
+)
 from .utils.fm_solvers import (
     FlowDPMSolverMultistepScheduler,
     get_sampling_sigmas,
     retrieve_timesteps,
 )
 from .utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
-
-
-def _looks_like_state_dict(obj):
-    return isinstance(obj, dict) and any(torch.is_tensor(v) for v in obj.values())
-
-
-def _extract_state_dict(checkpoint):
-    if _looks_like_state_dict(checkpoint):
-        return checkpoint
-
-    preferred_keys = (
-        "state_dict",
-        "model",
-        "module",
-        "model_state_dict",
-        "net",
-        "generator",
-        "ema",
-        "ema_state_dict",
-    )
-    for key in preferred_keys:
-        value = checkpoint.get(key) if isinstance(checkpoint, dict) else None
-        if _looks_like_state_dict(value):
-            return value
-
-    if isinstance(checkpoint, dict):
-        nested_candidates = [
-            value for value in checkpoint.values() if _looks_like_state_dict(value)
-        ]
-        if nested_candidates:
-            nested_candidates.sort(key=lambda item: len(item), reverse=True)
-            return nested_candidates[0]
-
-    raise ValueError("Unable to find a usable state_dict in the custom DiT checkpoint.")
-
-
-def _normalize_state_dict_key(key):
-    prefixes = (
-        "module.",
-        "_orig_mod.",
-        "model.",
-        "net.",
-        "generator.",
-        "ema_model.",
-        "ema.",
-        "diffusion_model.",
-    )
-    changed = True
-    while changed:
-        changed = False
-        for prefix in prefixes:
-            if key.startswith(prefix):
-                key = key[len(prefix):]
-                changed = True
-    return key
-
-
-def _load_checkpoint_file(checkpoint_path):
-    if checkpoint_path.endswith(".safetensors"):
-        return safe_load_file(checkpoint_path)
-    return torch.load(checkpoint_path, map_location="cpu")
 
 class WanT2V_Freeloc:
 
@@ -187,25 +131,52 @@ class WanT2V_Freeloc:
         checkpoint_path = os.path.abspath(checkpoint_path)
         logging.info(f"Loading custom DiT checkpoint from {checkpoint_path}")
 
-        raw_checkpoint = _load_checkpoint_file(checkpoint_path)
-        state_dict = _extract_state_dict(raw_checkpoint)
-        normalized_state_dict = {
-            _normalize_state_dict_key(key): value
-            for key, value in state_dict.items()
-        }
+        candidate_state_dict = load_state_dict_from_checkpoint(checkpoint_path)
+        target_state_dict = self.model.state_dict()
+        comparison = compare_state_dicts(target_state_dict, candidate_state_dict)
 
-        target_keys = set(self.model.state_dict().keys())
-        matched_keys = [key for key in normalized_state_dict if key in target_keys]
-        if not matched_keys:
+        if comparison["shared_key_count"] == 0:
             raise ValueError(
                 f"No matching DiT weights were found in custom checkpoint: {checkpoint_path}"
             )
 
+        if comparison["shape_mismatch_count"] > 0:
+            candidate_summary = summarize_state_dict(candidate_state_dict)
+            target_summary = summarize_state_dict(target_state_dict)
+            sample_mismatches = comparison["shape_mismatches"][:5]
+            mismatch_lines = [
+                f"{item['key']}: checkpoint{item['candidate_shape']} vs model{item['reference_shape']}"
+                for item in sample_mismatches
+            ]
+            hint = ""
+            if (
+                candidate_summary["patch_in_channels"] == 36
+                and target_summary["patch_in_channels"] == 16
+            ):
+                hint = (
+                    " The checkpoint looks like an i2v/flf2v-style conditional backbone "
+                    "with 36 input channels, while the current FreeLOC t2v backbone expects 16."
+                )
+            raise ValueError(
+                "Custom DiT checkpoint is not shape-compatible with the current FreeLOC backbone. "
+                f"Shared keys: {comparison['shared_key_count']}, "
+                f"shape mismatches: {comparison['shape_mismatch_count']}. "
+                f"Checkpoint family: {infer_model_family(candidate_summary)}; "
+                f"target family: {infer_model_family(target_summary)}. "
+                f"Examples: {'; '.join(mismatch_lines)}.{hint}"
+            )
+
+        filtered_state_dict = {
+            key: candidate_state_dict[key]
+            for key in target_state_dict.keys()
+            if key in candidate_state_dict
+        }
+
         missing_keys, unexpected_keys = self.model.load_state_dict(
-            normalized_state_dict, strict=False)
-        loaded_count = len(target_keys) - len(missing_keys)
+            filtered_state_dict, strict=False)
+        loaded_count = len(target_state_dict) - len(missing_keys)
         logging.info(
-            f"Loaded {loaded_count}/{len(target_keys)} DiT parameters from custom checkpoint."
+            f"Loaded {loaded_count}/{len(target_state_dict)} DiT parameters from custom checkpoint."
         )
 
         if missing_keys:
