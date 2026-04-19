@@ -116,6 +116,7 @@ python generate_freeloc.py \
   --task t2v-1.3B \
   --size 832*480 \
   --ckpt_dir /path/to/Wan2.1-T2V-1.3B \
+  --dit_checkpoint /path/to/CFmodel/stage3/model.pt \
   --offload_model True --t5_cpu \
   --sample_shift 8 \
   --sample_guide_scale 6 \
@@ -125,7 +126,7 @@ python generate_freeloc.py \
   --runtime_config wan/configs/freeloc_config.json
 ```
 
-FreeLOC's behavior is controlled via `--runtime_config`, which points to a JSON file (default: `wan/configs/freeloc_config.json`). The frame count `--frame_num` must satisfy 4n+1 (e.g., 81, 161, 321).
+FreeLOC's behavior is controlled via `--runtime_config`, which points to a JSON file (default: `wan/configs/freeloc_config.json`). The frame count `--frame_num` must satisfy 4n+1 (e.g., 81, 161, 321). If you want to keep the original Wan T5/VAE/tokenizer but replace only the main diffusion backbone, pass the custom transformer checkpoint with `--dit_checkpoint`.
 
 ## ⚙️ Runtime Configuration
 

@@ -15,6 +15,7 @@ from sympy import N
 import torch
 import torch.cuda.amp as amp
 import torch.distributed as dist
+from safetensors.torch import load_file as safe_load_file
 from tqdm import tqdm
 
 from .distributed.fsdp import shard_model
@@ -28,12 +29,74 @@ from .utils.fm_solvers import (
 )
 from .utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 
+
+def _looks_like_state_dict(obj):
+    return isinstance(obj, dict) and any(torch.is_tensor(v) for v in obj.values())
+
+
+def _extract_state_dict(checkpoint):
+    if _looks_like_state_dict(checkpoint):
+        return checkpoint
+
+    preferred_keys = (
+        "state_dict",
+        "model",
+        "module",
+        "model_state_dict",
+        "net",
+        "generator",
+        "ema",
+        "ema_state_dict",
+    )
+    for key in preferred_keys:
+        value = checkpoint.get(key) if isinstance(checkpoint, dict) else None
+        if _looks_like_state_dict(value):
+            return value
+
+    if isinstance(checkpoint, dict):
+        nested_candidates = [
+            value for value in checkpoint.values() if _looks_like_state_dict(value)
+        ]
+        if nested_candidates:
+            nested_candidates.sort(key=lambda item: len(item), reverse=True)
+            return nested_candidates[0]
+
+    raise ValueError("Unable to find a usable state_dict in the custom DiT checkpoint.")
+
+
+def _normalize_state_dict_key(key):
+    prefixes = (
+        "module.",
+        "_orig_mod.",
+        "model.",
+        "net.",
+        "generator.",
+        "ema_model.",
+        "ema.",
+        "diffusion_model.",
+    )
+    changed = True
+    while changed:
+        changed = False
+        for prefix in prefixes:
+            if key.startswith(prefix):
+                key = key[len(prefix):]
+                changed = True
+    return key
+
+
+def _load_checkpoint_file(checkpoint_path):
+    if checkpoint_path.endswith(".safetensors"):
+        return safe_load_file(checkpoint_path)
+    return torch.load(checkpoint_path, map_location="cpu")
+
 class WanT2V_Freeloc:
 
     def __init__(
         self,
         config,
         checkpoint_dir,
+        dit_checkpoint=None,
         device_id=0,
         rank=0,
         t5_fsdp=False,
@@ -50,6 +113,9 @@ class WanT2V_Freeloc:
                 Object containing model parameters initialized from config.py
             checkpoint_dir (`str`):
                 Path to directory containing model checkpoints
+            dit_checkpoint (`str`, *optional*, defaults to None):
+                Optional checkpoint file for overriding the DiT weights while
+                still using T5/VAE/tokenizer assets from `checkpoint_dir`.
             device_id (`int`,  *optional*, defaults to 0):
                 Id of target GPU device
             rank (`int`,  *optional*, defaults to 0):
@@ -89,6 +155,8 @@ class WanT2V_Freeloc:
 
         logging.info(f"Creating WanModel from {checkpoint_dir}")
         self.model = WanModel_Freeloc.from_pretrained(checkpoint_dir)
+        if dit_checkpoint is not None:
+            self._load_custom_dit_checkpoint(dit_checkpoint)
         self.model.eval().requires_grad_(False)
 
         if use_usp:
@@ -114,6 +182,42 @@ class WanT2V_Freeloc:
             self.model.to(self.device)
 
         self.sample_neg_prompt = config.sample_neg_prompt
+
+    def _load_custom_dit_checkpoint(self, checkpoint_path):
+        checkpoint_path = os.path.abspath(checkpoint_path)
+        logging.info(f"Loading custom DiT checkpoint from {checkpoint_path}")
+
+        raw_checkpoint = _load_checkpoint_file(checkpoint_path)
+        state_dict = _extract_state_dict(raw_checkpoint)
+        normalized_state_dict = {
+            _normalize_state_dict_key(key): value
+            for key, value in state_dict.items()
+        }
+
+        target_keys = set(self.model.state_dict().keys())
+        matched_keys = [key for key in normalized_state_dict if key in target_keys]
+        if not matched_keys:
+            raise ValueError(
+                f"No matching DiT weights were found in custom checkpoint: {checkpoint_path}"
+            )
+
+        missing_keys, unexpected_keys = self.model.load_state_dict(
+            normalized_state_dict, strict=False)
+        loaded_count = len(target_keys) - len(missing_keys)
+        logging.info(
+            f"Loaded {loaded_count}/{len(target_keys)} DiT parameters from custom checkpoint."
+        )
+
+        if missing_keys:
+            logging.warning(
+                f"Custom DiT checkpoint is missing {len(missing_keys)} parameters. "
+                f"First few: {missing_keys[:10]}"
+            )
+        if unexpected_keys:
+            logging.warning(
+                f"Custom DiT checkpoint has {len(unexpected_keys)} unexpected parameters. "
+                f"First few: {unexpected_keys[:10]}"
+            )
 
     @staticmethod
     def _apply_step_overrides(base_kwargs, step_overrides, step_idx):

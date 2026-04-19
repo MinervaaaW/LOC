@@ -1,0 +1,50 @@
+{
+  "generate": {
+    "force_offload_model": null
+  },
+  "text2video": {
+    "generate": {},
+    "model_forward_kwargs": {
+      "rope_type": null,
+      "enable_rp_map": true,
+      "enable_layer_modify": true,
+      "relative_map_mod": "vrpr",
+      "use_radial_attention": true,
+      "rope_relative_layers": null
+    },
+    "step_overrides": []
+  },
+  "model": {
+    "default_rope_relative_layers": [0, 1, 4, 6, 7, 9, 10, 11, 13, 14, 15, 16, 18, 22, 23, 24, 25],
+    "radial_attention": {
+      "window_size_1": 8,
+      "window_size_2": 24,
+      "fallback_multiplier": 12,
+      "rope_shift": {
+        "group_size": 8,
+        "window_size": 12
+      },
+      "diag_size_token_per_frame": 1560
+    },
+    "rp_map": {
+      "diag_size_token_per_frame": 1560,
+      "vrpr_clip_max": 20,
+      "vrpr": {
+        "frame_settings": {
+          "41": {
+            "window_size_1": 12,
+            "window_size_2": 20,
+            "group_size_1": 2,
+            "group_size_2": 8
+          },
+          "81": {
+            "window_size_1": 10,
+            "window_size_2": 14,
+            "group_size_1": 2,
+            "group_size_2": 8
+          }
+        }
+      }
+    }
+  }
+}

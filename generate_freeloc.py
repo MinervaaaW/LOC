@@ -67,6 +67,10 @@ def _validate_args(args):
     assert args.ckpt_dir is not None, "Please specify the checkpoint directory."
     assert args.task in WAN_CONFIGS, f"Unsupport task: {args.task}"
     assert args.task in EXAMPLE_PROMPT, f"Unsupport task: {args.task}"
+    if args.dit_checkpoint is not None:
+        assert os.path.isfile(
+            args.dit_checkpoint
+        ), f"Custom DiT checkpoint not found: {args.dit_checkpoint}"
 
     # The default sampling steps are 40 for image-to-video tasks and 50 for text-to-video tasks.
     if args.sample_steps is None:
@@ -125,6 +129,12 @@ def _parse_args():
         type=str,
         default=None,
         help="The path to the checkpoint directory.")
+    parser.add_argument(
+        "--dit_checkpoint",
+        type=str,
+        default=None,
+        help="Optional path to a custom DiT checkpoint file. T5/VAE/tokenizer are still loaded from --ckpt_dir."
+    )
     parser.add_argument(
         "--offload_model",
         type=str2bool,
@@ -372,6 +382,7 @@ def generate(args):
         wan_t2v = wan.WanT2V_Freeloc(
             config=cfg,
             checkpoint_dir=args.ckpt_dir,
+            dit_checkpoint=args.dit_checkpoint,
             device_id=device,
             rank=rank,
             t5_fsdp=args.t5_fsdp,

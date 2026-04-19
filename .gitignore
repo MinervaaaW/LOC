@@ -15,6 +15,7 @@
 *.ckpt
 *.safetensors
 *.json
+!wan/configs/freeloc_config.json
 # *.txt
 *.backup
 *.pkl
