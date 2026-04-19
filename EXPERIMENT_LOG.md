@@ -1,5 +1,73 @@
 # Experiment Log
 
+## 2026-04-20
+
+### Direction decision: preserve `t2v`, add a dedicated `i2v` FreeLOC path
+
+- Confirmed the repository should not replace the current FreeLOC `t2v` inference path.
+- Chosen direction:
+  keep the existing `t2v` FreeLOC path intact and implement a separate `i2v` FreeLOC path for the custom 36-channel checkpoint.
+- Reason for the decision:
+  the custom checkpoint is structurally `i2v/flf2v`-like rather than a drop-in `t2v` backbone.
+
+### Checkpoint comparison result recorded for implementation planning
+
+- Ran the comparison between the original Wan `t2v-1.3B` diffusion weights and the custom `stage3/model.pt`.
+- Result summary:
+  - reference `num_keys`: `825`
+  - candidate `num_keys`: `983`
+  - shared keys: `825`
+  - shape matches: `824`
+  - shape mismatches: `1`
+  - only mismatch: `patch_embedding.weight`
+  - reference `patch_embedding.weight`: `(1536, 16, 1, 2, 2)`
+  - candidate `patch_embedding.weight`: `(1536, 36, 1, 2, 2)`
+  - reference inferred family: `t2v-like`
+  - candidate inferred family: `i2v/flf2v-like`
+  - candidate contains `img_emb`
+  - candidate has `158` extra image-conditioning parameters, including:
+    - `cross_attn.k_img.*`
+    - `cross_attn.v_img.*`
+    - `cross_attn.norm_k_img.*`
+- Interpretation:
+  the checkpoint is largely compatible at the transformer block level, but requires an `i2v` model definition because the input channel contract and image-conditioning branches are different.
+
+### Detailed implementation plan documentation
+
+- Added a dedicated implementation plan file:
+  `I2V_FREELOC_PLAN.md`
+- The plan records:
+  - goal and scope
+  - decision summary
+  - phased implementation strategy
+  - validation checklist
+  - risks
+  - open dependencies
+  - expected deliverables
+
+### Planned implementation phases
+
+- Phase 1:
+  add a new `i2v-1.3B` config derived from the `t2v-1.3B` transformer size.
+- Phase 2:
+  add a dedicated `WanI2V_Freeloc` pipeline based on the existing `WanI2V` flow and the `WanModel_Freeloc` backbone.
+- Phase 3:
+  split checkpoint responsibilities so T5/VAE, CLIP, and custom DiT assets can be loaded explicitly.
+- Phase 4:
+  extend `generate_freeloc.py` with a new explicit task entry, keeping all current `t2v` behavior unchanged.
+- Phase 5:
+  add `image2video` runtime-config support parallel to the existing `text2video` config.
+- Phase 6:
+  implement first-pass single-image-conditioned long-video inference.
+- Phase 7:
+  run loading, smoke-test, and regression validation.
+
+### Constraints and risks recorded before implementation
+
+- The largest dependency risk is CLIP compatibility.
+- The FreeLOC runtime config currently targets `text2video`; `i2v` likely needs a separate config section.
+- Long-video quality at `161` or `321` frames is not guaranteed by structural compatibility alone and will need dedicated validation.
+
 ## 2026-04-19
 
 ### FreeLOC inference weight loading
