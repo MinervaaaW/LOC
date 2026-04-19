@@ -128,6 +128,27 @@ python generate_freeloc.py \
 
 FreeLOC's behavior is controlled via `--runtime_config`, which points to a JSON file (default: `wan/configs/freeloc_config.json`). The frame count `--frame_num` must satisfy 4n+1 (e.g., 81, 161, 321). If you want to keep the original Wan T5/VAE/tokenizer but replace only the main diffusion backbone, pass the custom transformer checkpoint with `--dit_checkpoint`.
 
+**FreeLOC Image-to-Video Long Video Generation**
+
+```bash
+python generate_freeloc.py \
+  --task i2v-1.3B \
+  --size 832*480 \
+  --ckpt_dir /path/to/Wan2.1-T2V-1.3B \
+  --clip_ckpt_dir /path/to/Wan2.1-I2V-14B-480P \
+  --dit_checkpoint /path/to/CFmodel/stage3/model.pt \
+  --image /path/to/conditioning_image.png \
+  --offload_model True --t5_cpu \
+  --sample_shift 8 \
+  --sample_guide_scale 6 \
+  --frame_num 81 \
+  --base_seed 42 \
+  --prompt "A focused man in a sleek, black athletic outfit sprints along a winding forest trail, surrounded by towering trees and dappled sunlight filtering through the leaves." \
+  --runtime_config wan/configs/freeloc_config.json
+```
+
+For the `i2v-1.3B` FreeLOC path, `--ckpt_dir` still provides T5 and VAE assets, `--dit_checkpoint` provides the custom 36-channel diffusion backbone, and `--clip_ckpt_dir` provides the CLIP assets required by the image-conditioned model.
+
 ## ⚙️ Runtime Configuration
 
 FreeLOC's behavior is controlled via a JSON runtime config (`wan/configs/freeloc_config.json`). Key settings:

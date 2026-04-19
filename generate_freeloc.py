@@ -39,6 +39,12 @@ EXAMPLE_PROMPT = {
         "image":
             "examples/i2v_input.JPG",
     },
+    "i2v-1.3B": {
+        "prompt":
+            "Summer beach vacation style, a white cat wearing sunglasses sits on a surfboard. The fluffy-furred feline gazes directly at the camera with a relaxed expression. Blurred beach scenery forms the background featuring crystal-clear waters, distant green hills, and a blue sky dotted with white clouds. The cat assumes a naturally relaxed posture, as if savoring the sea breeze and warm sunlight. A close-up shot highlights the feline's intricate details and the refreshing atmosphere of the seaside.",
+        "image":
+            "examples/i2v_input.JPG",
+    },
     "flf2v-14B": {
         "prompt":
             "CG动画风格，一只蓝色的小鸟从地面起飞，煽动翅膀。小鸟羽毛细腻，胸前有独特的花纹，背景是蓝天白云，阳光明媚。镜跟随小鸟向上移动，展现出小鸟飞翔的姿态和天空的广阔。近景，仰视视角。",
@@ -71,6 +77,17 @@ def _validate_args(args):
         assert os.path.isfile(
             args.dit_checkpoint
         ), f"Custom DiT checkpoint not found: {args.dit_checkpoint}"
+    if args.task == "i2v-1.3B":
+        assert args.dit_checkpoint is not None, (
+            "Task i2v-1.3B requires --dit_checkpoint because the custom 36-channel "
+            "backbone is not stored in the base Wan t2v checkpoint directory."
+        )
+        clip_checkpoint_dir = args.clip_ckpt_dir or args.ckpt_dir
+        clip_checkpoint = os.path.join(clip_checkpoint_dir,
+                                       WAN_CONFIGS[args.task].clip_checkpoint)
+        assert os.path.isfile(
+            clip_checkpoint
+        ), f"CLIP checkpoint not found for i2v-1.3B: {clip_checkpoint}"
 
     # The default sampling steps are 40 for image-to-video tasks and 50 for text-to-video tasks.
     if args.sample_steps is None:
@@ -134,6 +151,12 @@ def _parse_args():
         type=str,
         default=None,
         help="Optional path to a custom DiT checkpoint file. T5/VAE/tokenizer are still loaded from --ckpt_dir."
+    )
+    parser.add_argument(
+        "--clip_ckpt_dir",
+        type=str,
+        default=None,
+        help="Optional directory for CLIP assets used by i2v FreeLOC. Defaults to --ckpt_dir."
     )
     parser.add_argument(
         "--offload_model",
@@ -437,17 +460,33 @@ def generate(args):
             args.prompt = input_prompt[0]
             logging.info(f"Extended prompt: {args.prompt}")
 
-        logging.info("Creating WanI2V pipeline.")
-        wan_i2v = wan.WanI2V(
-            config=cfg,
-            checkpoint_dir=args.ckpt_dir,
-            device_id=device,
-            rank=rank,
-            t5_fsdp=args.t5_fsdp,
-            dit_fsdp=args.dit_fsdp,
-            use_usp=(args.ulysses_size > 1 or args.ring_size > 1),
-            t5_cpu=args.t5_cpu,
-        )
+        if args.task == "i2v-1.3B":
+            logging.info("Creating WanI2V FreeLOC pipeline.")
+            wan_i2v = wan.WanI2V_Freeloc(
+                config=cfg,
+                checkpoint_dir=args.ckpt_dir,
+                dit_checkpoint=args.dit_checkpoint,
+                clip_checkpoint_dir=args.clip_ckpt_dir,
+                device_id=device,
+                rank=rank,
+                t5_fsdp=args.t5_fsdp,
+                dit_fsdp=args.dit_fsdp,
+                use_usp=(args.ulysses_size > 1 or args.ring_size > 1),
+                t5_cpu=args.t5_cpu,
+                runtime_config=runtime_config,
+            )
+        else:
+            logging.info("Creating WanI2V pipeline.")
+            wan_i2v = wan.WanI2V(
+                config=cfg,
+                checkpoint_dir=args.ckpt_dir,
+                device_id=device,
+                rank=rank,
+                t5_fsdp=args.t5_fsdp,
+                dit_fsdp=args.dit_fsdp,
+                use_usp=(args.ulysses_size > 1 or args.ring_size > 1),
+                t5_cpu=args.t5_cpu,
+            )
 
         logging.info("Generating video ...")
         video = wan_i2v.generate(

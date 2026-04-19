@@ -68,6 +68,61 @@
 - The FreeLOC runtime config currently targets `text2video`; `i2v` likely needs a separate config section.
 - Long-video quality at `161` or `321` frames is not guaranteed by structural compatibility alone and will need dedicated validation.
 
+### Phase 1-5 implementation: first-pass `i2v` FreeLOC integration
+
+- Added a new 1.3B image-to-video config:
+  `wan/configs/wan_i2v_1_3B.py`
+- Registered the new task in `wan/configs/__init__.py`:
+  `i2v-1.3B`
+- Set the 1.3B `i2v` config to use:
+  - 1.3B transformer dimensions (`dim=1536`, `num_heads=12`, `num_layers=30`)
+  - `in_dim=36`
+  - CLIP assets required by image-conditioned inference
+
+- Added a new dedicated FreeLOC pipeline:
+  `wan/image2video_freeloc.py`
+- Implementation choice:
+  reuse `WanModel_Freeloc` with `model_type='i2v'` instead of trying to coerce the current `t2v` pipeline to accept the 36-channel checkpoint.
+- The new pipeline:
+  - loads T5 from `--ckpt_dir`
+  - loads VAE from `--ckpt_dir`
+  - loads CLIP from `--clip_ckpt_dir`
+  - loads the custom 36-channel backbone from `--dit_checkpoint`
+  - reuses FreeLOC runtime config overrides and step overrides during sampling
+
+- Updated `wan/__init__.py` to export `WanI2V_Freeloc`.
+
+- Updated `generate_freeloc.py`:
+  - added `i2v-1.3B` example prompt and image entry
+  - added `--clip_ckpt_dir`
+  - required `--dit_checkpoint` for `i2v-1.3B`
+  - validated the CLIP checkpoint path for the new task
+  - routed `i2v-1.3B` to `WanI2V_Freeloc`
+  - kept existing `t2v`, `i2v-14B`, `flf2v`, and `vace` routing unchanged
+
+- Updated `generate.py` to reject `i2v-1.3B` explicitly and direct users to `generate_freeloc.py`, preventing accidental use through the standard non-FreeLOC entry point.
+
+- Extended runtime config support:
+  - added `image2video` defaults in `wan/runtime_config_freeloc.py`
+  - added `image2video` section in `wan/configs/freeloc_config.json`
+
+- Added `FreeLOC_i2v_inference.sh` as an example command for the new `i2v-1.3B` FreeLOC path.
+
+- Updated `README.md` with a first-pass `i2v-1.3B` FreeLOC inference example and asset-role explanation for:
+  - `--ckpt_dir`
+  - `--dit_checkpoint`
+  - `--clip_ckpt_dir`
+
+### First-pass verification
+
+- `python -m py_compile generate_freeloc.py generate.py wan/image2video_freeloc.py wan/configs/wan_i2v_1_3B.py wan/runtime_config_freeloc.py wan/__init__.py`
+
+### Current status after first-pass implementation
+
+- The codebase now has a dedicated structural path for the custom 36-channel `i2v` checkpoint.
+- The existing `t2v` FreeLOC path remains present and separately routed.
+- Runtime correctness against the real model assets is not yet verified in a full inference run; the next step is a smoke test on the target environment with real T5/VAE/CLIP/custom-backbone files.
+
 ## 2026-04-19
 
 ### FreeLOC inference weight loading

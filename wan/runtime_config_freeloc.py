@@ -20,6 +20,18 @@ DEFAULT_RUNTIME_CONFIG: Dict[str, Any] = {
         },
         "step_overrides": []
     },
+    "image2video": {
+        "generate": {},
+        "model_forward_kwargs": {
+            "rope_type": None,
+            "enable_rp_map": True,
+            "enable_layer_modify": True,
+            "relative_map_mod": "vrpr",
+            "use_radial_attention": True,
+            "rope_relative_layers": None
+        },
+        "step_overrides": []
+    },
     "model": {
         "default_rope_relative_layers": [0, 1, 4, 6, 7, 9, 10, 11, 13, 14, 15, 16, 18, 22, 23, 24, 25],
         "radial_attention": {

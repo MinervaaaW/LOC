@@ -1,0 +1,16 @@
+python generate_freeloc.py \
+  --task i2v-1.3B \
+  --size 832*480 \
+  --ckpt_dir /commondocument/group2/Self-Forcing/wan_models/Wan2.1-T2V-1.3B \
+  --clip_ckpt_dir /commondocument/group2/Self-Forcing/wan_models/Wan2.1-I2V-14B-480P \
+  --dit_checkpoint /commondocument/group2/CFmodel/stage3/model.pt \
+  --image /path/to/conditioning_image.png \
+  --offload_model True \
+  --t5_cpu \
+  --sample_shift 8 \
+  --sample_guide_scale 6 \
+  --frame_num 81 \
+  --base_seed 500 \
+  --runtime_config wan/configs/freeloc_config.json \
+  --prompt "A focused man in a sleek, black athletic outfit sprints along a winding forest trail, surrounded by towering trees and dappled sunlight filtering through the leaves." \
+  --save_file ~/FreeLOC/Long_Vid_Wan2.1_I2V/81

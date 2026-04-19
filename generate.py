@@ -65,6 +65,11 @@ def _validate_args(args):
     # Basic check
     assert args.ckpt_dir is not None, "Please specify the checkpoint directory."
     assert args.task in WAN_CONFIGS, f"Unsupport task: {args.task}"
+    if args.task == "i2v-1.3B":
+        raise ValueError(
+            "Task i2v-1.3B is reserved for the FreeLOC pipeline. "
+            "Use generate_freeloc.py instead of generate.py."
+        )
     assert args.task in EXAMPLE_PROMPT, f"Unsupport task: {args.task}"
 
     # The default sampling steps are 40 for image-to-video tasks and 50 for text-to-video tasks.
